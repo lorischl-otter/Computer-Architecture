@@ -7,6 +7,11 @@ HLT = 0b00000001  # Stops program and exits simulator
 LDI = 0b10000010  # Loads immediate (cp+2) into a given register (cp+1)
 PRN = 0b01000111  # Prints the value at a given register (cp+1)
 MUL = 0b10100010  # ALU - multiplies two registers
+PUSH = 0b01000101  # PUSH - push value in given reg (cp+1) to stack
+POP = 0b01000110  # POP - pop value at top of stack to given reg (cp+1)
+
+# Determine Stack Pointer position
+SP = 7
 
 # Qs: Is this what the instructions are supposed to look like?
 
@@ -18,6 +23,7 @@ class CPU:
         """Construct a new CPU."""
         self.ram = [0] * 256
         self.reg = [0] * 8
+        self.reg[SP] = 0xf4
         self.pc = 0
         self.running = True  # is this necessary?
 
@@ -99,6 +105,9 @@ class CPU:
 
     def run(self):
         """Run the CPU."""
+
+        # branch = BranchTable()
+
         while self.running:
             ir = self.ram_read(self.pc)
 
@@ -121,6 +130,32 @@ class CPU:
                 self.alu('MUL', operand_a, operand_b)
                 self.pc += 3
 
+            elif ir == PUSH:  # PUSH
+                self.reg[SP] -= 1
+
+                # Get value from register
+                value = self.reg[operand_a]
+
+                # Store it on the stack
+                top_of_stack_addr = self.reg[SP]
+                self.ram[top_of_stack_addr] = value
+
+                self.pc += 2
+
+                # print(f"stack: {self.ram[0xE4:0xF4]}")
+
+            elif ir == POP:  # POP
+                # Get value from top of stack
+                top_of_stack_addr = self.reg[SP]
+                value = self.ram[top_of_stack_addr]
+
+                # Get reg number and store value
+                self.reg[operand_a] = value
+
+                self.reg[SP] += 1
+
+                self.pc += 2
+
             else:
                 print('Instruction not found')
                 sys.exit(1)
@@ -136,3 +171,35 @@ class CPU:
         Write given value into RAM at given address.
         """
         self.ram[address] = value
+
+
+# class BranchTable:
+
+#     def __init__(self):
+#         self.branchtable = {}
+#         self.branchtable[HLT] = self.handle_hlt
+#         self.branchtable[LDI] = self.handle_ldi
+#         self.branchtable[PRN] = self.handle_prn
+#         self.branchtable[MUL] = self.handle_mul
+
+#     def handle_hlt(self):
+#         print("Halted")
+#         self.running = False
+#         sys.exit(0)
+
+#     def handle_ldi(self):
+#         self.reg
+
+#     def handle_prn(self):
+#         pass
+
+#     def handle_mul(self):
+#         self.alu('MUL', operand_a, operand_b)
+
+#     def run(self):
+#         ir = self.ram_read(self.pc)
+
+    # Find a way to make more DRY?
+    # figure out what arguments to include
+    # how to incorporate with operands ? / rest of comment?
+    # include a standardized something for cpu incrementing?
