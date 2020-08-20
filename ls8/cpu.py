@@ -7,8 +7,11 @@ HLT = 0b00000001  # Stops program and exits simulator
 LDI = 0b10000010  # Loads immediate (cp+2) into a given register (cp+1)
 PRN = 0b01000111  # Prints the value at a given register (cp+1)
 MUL = 0b10100010  # ALU - multiplies two registers
-PUSH = 0b01000101  # PUSH - push value in given reg (cp+1) to stack
-POP = 0b01000110  # POP - pop value at top of stack to given reg (cp+1)
+ADD = 0b10100000  # ALU - adds two registers
+PUSH = 0b01000101  # push value in given reg (cp+1) to stack
+POP = 0b01000110  # pop value at top of stack to given reg (cp+1)
+CALL = 0b01010000  # calls a subroutine at given reg (cp+1)
+RET = 0b00010001  # return from subroutine
 
 # Determine Stack Pointer position
 SP = 7
@@ -114,23 +117,27 @@ class CPU:
             operand_a = self.ram_read(self.pc + 1)
             operand_b = self.ram_read(self.pc + 2)
 
-            if ir == LDI:  # LDI (load immediate)
+            if ir == LDI:
                 self.reg[operand_a] = operand_b
                 self.pc += 3
 
-            elif ir == PRN:  # PRN (print)
+            elif ir == PRN:
                 print(self.reg[operand_a])
                 self.pc += 2
 
-            elif ir == HLT:  # HLT (halt)
+            elif ir == HLT:
                 self.running = False
                 sys.exit(0)
 
-            elif ir == MUL:  # MUL (multiply)
+            elif ir == MUL:
                 self.alu('MUL', operand_a, operand_b)
                 self.pc += 3
 
-            elif ir == PUSH:  # PUSH
+            elif ir == ADD:
+                self.alu('ADD', operand_a, operand_b)
+                self.pc += 3
+
+            elif ir == PUSH:
                 self.reg[SP] -= 1
 
                 # Get value from register
@@ -144,7 +151,7 @@ class CPU:
 
                 # print(f"stack: {self.ram[0xE4:0xF4]}")
 
-            elif ir == POP:  # POP
+            elif ir == POP:
                 # Get value from top of stack
                 top_of_stack_addr = self.reg[SP]
                 value = self.ram[top_of_stack_addr]
@@ -156,8 +163,25 @@ class CPU:
 
                 self.pc += 2
 
+            elif ir == CALL:
+                # Push return address
+                ret_addr = self.pc + 2
+                self.reg[SP] -= 1
+                self.ram[self.reg[SP]] = ret_addr
+
+                # Call subroutine
+                self.pc = self.reg[operand_a]
+
+            elif ir == RET:
+                # Pop return addr off the stack
+                ret_addr = self.ram[self.reg[SP]]
+                self.reg[SP] += 1
+
+                # Set PC
+                self.pc = ret_addr
+
             else:
-                print('Instruction not found')
+                print('Instruction not found:', self.pc)
                 sys.exit(1)
 
     def ram_read(self, address):
