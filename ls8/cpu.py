@@ -48,6 +48,7 @@ class CPU:
         self.branchtable[JMP] = self.handle_jmp
         self.branchtable[JEQ] = self.handle_jeq
         self.branchtable[JNE] = self.handle_jne
+        self.branchtable[ADDI] = self.handle_addi
 
     def load(self):
         """Load a program into memory."""
@@ -96,7 +97,9 @@ class CPU:
         """ALU operations."""
 
         if op == CMP:
-            self.branchtable[op](reg_a, reg_b)            
+            self.branchtable[op](reg_a, reg_b)
+        elif op == ADDI:
+            self.branchtable[op](reg_a, reg_b)
         elif op == ADD:
             self.reg[reg_a] += self.reg[reg_b]
         elif op == SUB:
@@ -250,3 +253,6 @@ class CPU:
             self.handle_jmp(reg_num, operand_b)
         else:
             self.pc += 2
+
+    def handle_addi(self, reg_num, immediate):
+        self.reg[reg_num] += immediate
