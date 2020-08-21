@@ -19,6 +19,10 @@ CMP = 0b10100111
 JMP = 0b01010100
 JEQ = 0b01010101
 JNE = 0b01010110
+AND = 0b10101000
+OR = 0b10101010
+NOT = 0b01101001
+
 
 # Determine Stack Pointer position
 SP = 7
@@ -56,6 +60,9 @@ class CPU:
         self.alu_branchtable[MUL] = self.handle_mul
         self.alu_branchtable[CMP] = self.handle_cmp
         self.alu_branchtable[ADDI] = self.handle_addi
+        self.alu_branchtable[AND] = self.handle_and
+        self.alu_branchtable[OR] = self.handle_or
+        self.alu_branchtable[NOT] = self.handle_not
 
     def load(self):
         """Load a program into memory."""
@@ -296,3 +303,32 @@ class CPU:
         Adds an immediate to value in reg_a.
         """
         self.reg[reg_num] += immediate
+
+    def handle_and(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Perform bitwise-AND between values in reg_a and reg_b.
+        Store result in reg_a.
+        """
+        value_a = self.reg[reg_a]
+        value_b = self.reg[reg_b]
+        self.reg[reg_a] = value_a & value_b
+
+    def handle_or(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Perform bitwise-OR between values in reg_a and reg_b.
+        Store result in reg_a.
+        """
+        value_a = self.reg[reg_a]
+        value_b = self.reg[reg_b]
+        self.reg[reg_a] = value_a | value_b
+
+    def handle_not(self, reg_a, operand_b):
+        """
+        ALU Instruction.
+        Perform bitwise-NOT on value in reg_a.
+        Store result in reg_a.
+        """
+        value = self.reg[reg_a]
+        self.reg[reg_a] = ~ value
