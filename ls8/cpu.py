@@ -3,16 +3,26 @@
 import sys
 
 # Instruction definitions
-HLT = 0b00000001  # Stops program and exits simulator
-LDI = 0b10000010  # Loads immediate (cp+2) into a given register (cp+1)
-PRN = 0b01000111  # Prints the value at a given register (cp+1)
-MUL = 0b10100010  # ALU - multiplies two registers
-ADD = 0b10100000  # ALU - adds two registers
-SUB = 0b10100001  # ALU - subtracts two registers
-PUSH = 0b01000101  # push value in given reg (cp+1) to stack
-POP = 0b01000110  # pop value at top of stack to given reg (cp+1)
-CALL = 0b01010000  # calls a subroutine at given reg (cp+1)
-RET = 0b00010001  # return from subroutine
+HLT = 0b00000001
+LDI = 0b10000010
+PRN = 0b01000111
+MUL = 0b10100010
+ADD = 0b10100000
+ADDI = 0b10100101
+SUB = 0b10100001
+PUSH = 0b01000101
+POP = 0b01000110
+CALL = 0b01010000
+RET = 0b00010001
+ST = 0b10000100
+CMP = 0b10100111
+JMP = 0b01010100
+JEQ = 0b01010101
+JNE = 0b01010110
+AND = 0b10101000
+OR = 0b10101010
+NOT = 0b01101001
+
 
 # Determine Stack Pointer position
 SP = 7
@@ -27,7 +37,9 @@ class CPU:
         self.reg = [0] * 8
         self.reg[SP] = 0xf4
         self.pc = 0
+        self.fl = 0b00000000
 
+        # Initiate branchtable
         self.branchtable = {}
         self.branchtable[HLT] = self.handle_hlt
         self.branchtable[LDI] = self.handle_ldi
@@ -36,6 +48,21 @@ class CPU:
         self.branchtable[POP] = self.handle_pop
         self.branchtable[CALL] = self.handle_call
         self.branchtable[RET] = self.handle_ret
+        self.branchtable[ST] = self.handle_st
+        self.branchtable[JMP] = self.handle_jmp
+        self.branchtable[JEQ] = self.handle_jeq
+        self.branchtable[JNE] = self.handle_jne
+
+        # Initiate ALU branchtable
+        self.alu_branchtable = {}
+        self.alu_branchtable[ADD] = self.handle_add
+        self.alu_branchtable[SUB] = self.handle_sub
+        self.alu_branchtable[MUL] = self.handle_mul
+        self.alu_branchtable[CMP] = self.handle_cmp
+        self.alu_branchtable[ADDI] = self.handle_addi
+        self.alu_branchtable[AND] = self.handle_and
+        self.alu_branchtable[OR] = self.handle_or
+        self.alu_branchtable[NOT] = self.handle_not
 
     def load(self):
         """Load a program into memory."""
@@ -83,14 +110,12 @@ class CPU:
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
-        if op == ADD:
-            self.reg[reg_a] += self.reg[reg_b]
-        elif op == SUB:
-            self.reg[reg_a] -= self.reg[reg_b]
-        elif op == MUL:
-            self.reg[reg_a] *= self.reg[reg_b]
-        else:
-            raise Exception("Unsupported ALU operation")
+        try:
+            self.alu_branchtable[op](reg_a, reg_b)
+
+        except KeyError:
+            print("Unsupported ALU operation")
+            sys.exit(1)
 
     def trace(self):
         """
@@ -146,16 +171,20 @@ class CPU:
         """
         self.ram[address] = value
 
-    def handle_ldi(self, reg_num, value):
-        self.reg[reg_num] = value
+    def handle_ldi(self, reg_num, immediate):
+        """Load an immediate into a given register."""
+        self.reg[reg_num] = immediate
 
     def handle_prn(self, reg_num, operand_b):
+        """Print value at a given register."""
         print(self.reg[reg_num])
 
     def handle_hlt(self, operand_a, operand_b):
+        """Stop program and exit simulator."""
         sys.exit(0)
 
     def handle_push(self, reg_num, operand_b):
+        """Push value in register onto stack."""
         self.reg[SP] -= 1
 
         # Get value from register
@@ -166,6 +195,7 @@ class CPU:
         self.ram[top_of_stack_addr] = value
 
     def handle_pop(self, reg_num, operand_b):
+        """ Pop value at top of stack to given register."""
         # Get value from top of stack
         top_of_stack_addr = self.reg[SP]
         value = self.ram[top_of_stack_addr]
@@ -176,6 +206,7 @@ class CPU:
         self.reg[SP] += 1
 
     def handle_call(self, subroutine, operand_b):
+        """Call subroutine at given register."""
         # Push return address
         ret_addr = self.pc + 2
         self.reg[SP] -= 1
@@ -185,9 +216,119 @@ class CPU:
         self.pc = self.reg[subroutine]
 
     def handle_ret(self, operand_a, operand_b):
+        """Return from subroutine."""
         # Pop return addr off the stack
         ret_addr = self.ram[self.reg[SP]]
         self.reg[SP] += 1
 
         # Set PC
         self.pc = ret_addr
+
+    def handle_st(self, reg_a, reg_b):
+        """Store value in reg_b to address stored in reg_a."""
+        value = self.reg[reg_b]
+        address = self.reg[reg_a]
+        self.ram_write(value, address)
+
+    def handle_jmp(self, reg_num, operand_b):
+        """Jump to address in given register."""
+        self.pc = self.reg[reg_num]
+        # self.pc = self.ram_read(address)
+        # print("successful jump to", self.pc)
+
+    def handle_jeq(self, reg_num, operand_b):
+        """If equal flag is True, jump to address in given register."""
+        # Check if equal flag is true
+        if self.fl & 1 == 1:
+            self.handle_jmp(reg_num, operand_b)
+        else:
+            self.pc += 2
+        # print("successful jeq")
+
+    def handle_jne(self, reg_num, operand_b):
+        """If equal flag is clear, jump to address in given register."""
+        # Check to see if equal flag is false
+        if self.fl & 1 == 0:
+            self.handle_jmp(reg_num, operand_b)
+        else:
+            self.pc += 2
+
+    def handle_add(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Adds two registers and stores in reg_a.
+        """
+        self.reg[reg_a] += self.reg[reg_b]
+
+    def handle_sub(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Subtracts two registers and stores in reg_a.
+        """
+        self.reg[reg_a] -= self.reg[reg_b]
+
+    def handle_mul(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Multiplies two registers and stores in reg_a.
+        """
+        self.reg[reg_a] *= self.reg[reg_b]
+
+    def handle_cmp(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Compares two registers and sets self.fl based on outcome.
+        """
+        valueA = self.reg[reg_a]
+        valueB = self.reg[reg_b]
+
+        if valueA == valueB:
+            # set equal flag to 1
+            self.fl = 0b00000001
+
+        elif valueA < valueB:
+            # set less-than flag to 1
+            self.fl = 0b00000100
+
+        elif valueA > valueB:
+            # set greater-than flag to 1
+            self.fl = 0b00000010
+
+        else:
+            raise TypeError("Values provided to handle_cmp() not comparable")
+
+    def handle_addi(self, reg_num, immediate):
+        """
+        ALU Instruction.
+        Adds an immediate to value in reg_a.
+        """
+        self.reg[reg_num] += immediate
+
+    def handle_and(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Perform bitwise-AND between values in reg_a and reg_b.
+        Store result in reg_a.
+        """
+        value_a = self.reg[reg_a]
+        value_b = self.reg[reg_b]
+        self.reg[reg_a] = value_a & value_b
+
+    def handle_or(self, reg_a, reg_b):
+        """
+        ALU Instruction.
+        Perform bitwise-OR between values in reg_a and reg_b.
+        Store result in reg_a.
+        """
+        value_a = self.reg[reg_a]
+        value_b = self.reg[reg_b]
+        self.reg[reg_a] = value_a | value_b
+
+    def handle_not(self, reg_a, operand_b):
+        """
+        ALU Instruction.
+        Perform bitwise-NOT on value in reg_a.
+        Store result in reg_a.
+        """
+        value = self.reg[reg_a]
+        self.reg[reg_a] = ~ value
